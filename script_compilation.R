@@ -1,6 +1,11 @@
-setwd("~/Documents/R&Stats/Pour Bichette/Tableaux_abondances")
+
 library(openxlsx)
 library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggalt)
+
+setwd("~/Documents/R&Stats/Pour Bichette/Tableaux_abondances")
 
 ajout_annee_enclos = function(annee,enclos,don) {
   nom_tab = paste(annee,enclos,sep = "_")
@@ -16,7 +21,7 @@ ajout_annee_enclos = function(annee,enclos,don) {
 
 don = data.frame()
 
-years = c(2004:2012)
+years = c(2004:2016)
 modalite_enclos = c("in","out")
 
 for (annee in years) {
@@ -30,12 +35,16 @@ for (annee in years) {
 
 
 nom_a_changer = c("Buse","Corneille","Coucou","Etourneau","Geai","Gobe mouche gris","Grimpereau","Gros-bec","Huppe",
-                  "Hypolaïs","Merle","Pie","Pinson","Sitelle","Troglodyte","Verdier","Loriot")
+                  "Hypolaïs","Merle","Pie","Pinson","Sitelle ","Troglodyte","Verdier","Loriot",
+                  "proyer","Rougegorge","Tarier patre","Hypolaïs","Hypolais polyglotte","Huppe fascié","Alouette lulu ",
+                  "Roitelet à trible bandeau","Pic vert ","Grand Corbeau","Sittelle ","Tarier patre ")
 
 nouveau_nom = c("Buse variable","Corneille noire","Coucou gris","Etourneau sansonnet","Geai des chênes",
                 "Gobemouche gris","Grimpereau des jardins","Gros-bec casse noyaux","Huppe fasciée",
                 "Hypolaïs polyglotte","Merle noir","Pie bavarde","Pinson des arbres","Sitelle torchepot",
-                "Troglodyte mignon","Verdier d'Europe","Loriot d'Europe")
+                "Troglodyte mignon","Verdier d'Europe","Loriot d'Europe","Bruant proyer","Rouge-gorge",
+                "Tarier pâtre",rep("Hypolaïs polyglotte",2),"Huppe fasciée","Roitelet à triple bandeau",
+                "Alouette lulu","Pic vert","Grand corbeau","Sittelle torchepot","Tarier pâtre")
 
 
 
@@ -46,14 +55,16 @@ for (nom in c(1:length(nom_a_changer))) {
 }
 
 
-# Ajout guilde déchaînée
+# Ajout guilde des chênaies
 
 guilde_chenes = c("Fauvette à tête noire","Pinson des arbres","Pouillot véloce",
                   "Grimpereau des jardins","Loriot d'Europe","Mésange bleue",
-                  "Sitelle torchepot","Pic épeiche","Pic épeichette",
+                  "Sittelle torchepot","Pic épeiche","Pic épeichette",
                   "Troglodyte mignon","Mésange à longue queue","Mésange charbonnière",
-                  "Coucou gris","Roitelet à triple bandeau","Pic vert","Pic mar",
-                  "Fauvette des jardins","Mésange nonette")
+                  "Coucou gris","Roitelet à triple bandeau","Pic vert")
+
+
+
 
 don = don %>% mutate(Guilde_chenes = Espèces %in% guilde_chenes)
 
@@ -61,25 +72,62 @@ don = don %>% mutate(Guilde_chenes = Espèces %in% guilde_chenes)
 don$enclos = as.factor(don$enclos)
 don$Espèces = as.factor(don$Espèces)
 
-oiseau = sample(don$Espèces,1)
-ggplot(data = filter(don,Espèces==oiseau),aes(x = annee,y=Abondance,col = enclos)) + geom_line() + geom_point() + ylab(oiseau)
-ggplot(data = don,aes(x = annee,y=Abondance,col = Espèces)) + geom_line() + geom_point()
-
-ggplot(data = don,aes(x = enclos,y = Abondance,fill = Guilde_chenes)) + geom_boxplot() + scale_fill_viridis_c()
-
-
-# Exemple corrélation sur la sittelle
-out = filter(don,Espèces == "Sittelle") %>% filter(enclos == "out")
-inn = filter(don,Espèces == "Sittelle") %>% filter(enclos == "in")
-cor.test(out$Abondance,inn$Abondance)
-
-test_cor = function(bird_name) {
-  out = filter(don,Espèces == bird_name) %>% filter(enclos == "out")
-  inn = filter(don,Espèces == bird_name) %>% filter(enclos == "in")
-  if (nrow(out)!=nrow(inn)) {
-    return(" /!\ Pas autant d'observations pour enclos in et out")
+cor_guilde = function(guilde) {
+  p.val = c()
+  cor = c()
+  bird = c()
+  for (bird_name in guilde) {
+    
+    out = filter(don,Espèces == bird_name) %>% filter(enclos == "out")
+    inn = filter(don,Espèces == bird_name) %>% filter(enclos == "in")
+    print(out)
+    print(inn)
+    
+    if ( (length(out$Abondance) == 0 ) || (length(inn$Abondance)==0) ) {
+      next
+    }
+    join = inner_join(out,inn,by = c("annee"))
+    print(join)
+    
+    if (nrow(join) == 1) {
+      next
+    }
+    bird = c(bird,bird_name)
+    test = cor.test(join$Abondance.x,join$Abondance.y)
+    cor = c(cor,test$estimate)
+    p.val = c(p.val,test$p.value)
+    
+    
+    
   }
-  print(cor.test(out$Abondance,inn$Abondance))
-  ggplot(data = filter(don,Espèces==bird_name),aes(x = annee,y=Abondance,col = enclos)) + geom_line() + geom_point() + ylab(bird_name)
+  print(bird)
+  don_cor = data.frame(Espèces = bird,cor = cor,p.val = p.val) %>% mutate(significatif = p.val<0.05)
+  
+  
+  return(don_cor)
 }
+
+
+don_cor = cor_guilde(guilde_chenes)
+
+don_cor = mutate(don_cor,cor_negative = cor<0)
+
+#Non colored graph
+ggplot(data = don_cor,aes(x = Espèces,y = cor,col = cor_negative,shape = significatif)) + geom_lollipop(size = 2) +
+  labs(col = c(""),shape = " ") + scale_color_discrete(labels = c("Corrélation positive","Corrélation négative")) + 
+  scale_shape_discrete(labels = c("Corrélation non significative","Corrélation significative")) + ylab("Corrélation") + 
+  geom_hline(yintercept = 0,col = 'black',linetype = "dashed") + theme(legend.text = element_text(size = 15),axis.text.x = element_text(angle = 45,size = 15),title = element_text(size = 15),axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15)) +
+  ggtitle("Corrélation entre l'évolution des abondances dans ou hors enclos, \n pour la guilde des insectivores des chênaies") 
+
+#Colored graph
+ggplot(data = don_cor,aes(x = Espèces,y = cor,col = cor_negative,shape = significatif)) +
+  geom_rect(xmin = 0,xmax = 500,ymin = 0,ymax = 500,alpha = 0.3,fill = '#f5b7b1') +
+  geom_rect(xmin = 0,xmax = 500,ymin = -500, ymax = 0,alpha = 0.3,fill = "#76d7c4") + geom_lollipop(size = 2) +
+  labs(col = c(""),shape = " ") + scale_color_discrete(labels = c("Corrélation positive","Corrélation négative")) + 
+  scale_shape_discrete(labels = c("Corrélation non significative","Corrélation significative")) + ylab("Corrélation") + 
+  geom_hline(yintercept = 0,col = 'black',linetype = "dashed") + theme(legend.text = element_text(size = 15),axis.text.x = element_text(angle = 45,size = 15),title = element_text(size = 15),axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15)) +
+  ggtitle("Corrélation entre l'évolution des abondances dans ou hors enclos, \n pour la guilde des insectivores des chênaies") 
+  
+
+
 
