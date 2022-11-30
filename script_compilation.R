@@ -5,7 +5,7 @@ library(ggplot2)
 library(ggrepel)
 library(ggalt)
 
-setwd("~/Documents/R&Stats/Pour Bichette/Tableaux_abondances")
+setwd("Path toward your .xlsx files")
 
 ajout_annee_enclos = function(annee,enclos,don) {
   nom_tab = paste(annee,enclos,sep = "_")
